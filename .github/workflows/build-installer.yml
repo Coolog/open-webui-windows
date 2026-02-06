@@ -7,7 +7,7 @@ on:
       - 'v*'
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 jobs:
   build:
@@ -17,26 +17,63 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
+    - name: Download Python Embeddable
+      run: |
+        # 下载 Python 3.11 嵌入式版本（不需要安装，可直接运行）
+        $pythonUrl = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip"
+        $pipUrl = "https://bootstrap.pypa.io/get-pip.py"
+        
+        Write-Host "Downloading Python 3.11 embeddable..."
+        Invoke-WebRequest -Uri $pythonUrl -OutFile "python-embed.zip" -UseBasicParsing
+        
+        Write-Host "Extracting Python..."
+        Expand-Archive -Path "python-embed.zip" -DestinationPath "python" -Force
+        
+        # 修改 python311._pth 以启用 pip 和 site-packages
+        $pthFile = "python/python311._pth"
+        $pthContent = @"
+python311.zip
+.
+Lib/site-packages
+
+import site
+"@
+        Set-Content -Path $pthFile -Value $pthContent
+        
+        # 创建 Lib/site-packages 目录
+        New-Item -ItemType Directory -Path "python/Lib/site-packages" -Force
+        
+        # 下载 get-pip.py
+        Write-Host "Downloading pip..."
+        Invoke-WebRequest -Uri $pipUrl -OutFile "python/get-pip.py" -UseBasicParsing
+        
+        # 安装 pip
+        Write-Host "Installing pip..."
+        & "python/python.exe" "python/get-pip.py" --no-warn-script-location
+        
+        # 验证
+        Write-Host "Python version:"
+        & "python/python.exe" --version
+        Write-Host "Pip version:"
+        & "python/python.exe" -m pip --version
+        
+        # 列出文件
+        Write-Host "Python directory contents:"
+        Get-ChildItem -Path "python" -Name
+      shell: pwsh
+    
     - name: Download and Setup Inno Setup
       run: |
-        # 下载 Inno Setup
         $url = "https://jrsoftware.org/download.php/is.exe"
         $output = "$env:TEMP\innosetup.exe"
         Write-Host "Downloading Inno Setup..."
         Invoke-WebRequest -Uri $url -OutFile $output -UseBasicParsing
         
-        # 静默安装 Inno Setup
         Write-Host "Installing Inno Setup..."
         Start-Process -FilePath $output -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-" -Wait
         
-        # 添加到 PATH
         $innoPath = "C:\Program Files (x86)\Inno Setup 6"
         echo "$innoPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      shell: pwsh
-    
-    - name: Verify Inno Setup Installation
-      run: |
-        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /? || true
       shell: pwsh
     
     - name: Create output directory
@@ -51,7 +88,7 @@ jobs:
     - name: List output files
       run: |
         Write-Host "=== Output directory contents ==="
-        Get-ChildItem -Path output -Recurse
+        Get-ChildItem -Path output -Recurse | Format-Table Name, Length
       shell: pwsh
     
     - name: Upload Installer Artifact

@@ -4,6 +4,7 @@ setlocal EnableDelayedExpansion
 
 :: ============================================================
 :: Open WebUI 启动脚本
+:: 使用内置嵌入式 Python
 :: ============================================================
 
 title Open WebUI
@@ -20,15 +21,14 @@ echo.
 set "SCRIPT_DIR=%~dp0"
 if "%SCRIPT_DIR:~-1%"=="\" set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
 
-:: 检查配置文件位置
 if exist "%SCRIPT_DIR%\app\config.bat" (
     call "%SCRIPT_DIR%\app\config.bat"
 ) else (
-    :: 使用默认路径（脚本所在目录）
     set "INSTALL_DIR=%SCRIPT_DIR%"
     set "APP_DIR=%SCRIPT_DIR%\app"
     set "DATA_DIR=%SCRIPT_DIR%\data"
-    set "VENV_DIR=%SCRIPT_DIR%\app\.venv"
+    set "PYTHON_DIR=%SCRIPT_DIR%\python"
+    set "PYTHON_EXE=%SCRIPT_DIR%\python\python.exe"
     set "LOGS_DIR=%SCRIPT_DIR%\app\logs"
     set "OLLAMA_CMD=ollama"
 )
@@ -37,15 +37,12 @@ echo [信息] 安装目录: %INSTALL_DIR%
 echo [信息] 数据目录: %DATA_DIR%
 echo.
 
-:: 确保目录存在
 if not exist "%LOGS_DIR%" mkdir "%LOGS_DIR%"
 if not exist "%DATA_DIR%" mkdir "%DATA_DIR%"
 
 :: ------------------------------------------------------------
-:: 设置 Open WebUI 环境变量（运行时设置，不修改系统变量）
+:: 设置 Open WebUI 环境变量
 :: ------------------------------------------------------------
-
-:: 离线模式配置（禁用自动更新）
 set "OFFLINE_MODE=true"
 set "RAG_EMBEDDING_MODEL_AUTO_UPDATE=false"
 set "RAG_RERANKING_MODEL_AUTO_UPDATE=false"
@@ -53,19 +50,14 @@ set "WHISPER_MODEL_AUTO_UPDATE=false"
 set "DISABLE_UPDATE_CHECK=true"
 set "ENABLE_PERSISTENT_CONFIG=False"
 
-:: 数据目录配置（关键！确保数据保存到指定位置）
 set "DATA_DIR=%DATA_DIR%"
-
-:: Ollama 配置
 set "OLLAMA_BASE_URL=http://localhost:11434"
 
-:: RAG Embedding 配置（使用本地 embedding 代理）
 set "RAG_EMBEDDING_ENGINE=openai"
 set "RAG_EMBEDDING_MODEL=qwen3-embedding:latest"
 set "RAG_OPENAI_API_BASE_URL=http://127.0.0.1:8001/v1"
 set "RAG_OPENAI_API_KEY=dummy"
 
-:: OpenAI 兼容配置
 set "OPENAI_API_BASE_URL=http://127.0.0.1:8001/v1"
 set "OPENAI_API_URL=http://127.0.0.1:8001/v1"
 set "OPENAI_API_BASE=http://127.0.0.1:8001/v1"
@@ -89,14 +81,12 @@ if not exist "%OLLAMA_CMD%" (
 :: ------------------------------------------------------------
 echo [1/3] 启动 Ollama 服务...
 
-:: 检查 Ollama 是否已在运行
 powershell -Command "try { $r = Invoke-WebRequest -Uri 'http://localhost:11434/api/tags' -TimeoutSec 2 -UseBasicParsing; exit 0 } catch { exit 1 }" >nul 2>&1
 if %errorlevel% equ 0 (
     echo       ✓ Ollama 服务已在运行
 ) else (
     start /b "" "!OLLAMA_CMD!" serve >"%LOGS_DIR%\ollama.log" 2>&1
     
-    :: 等待 Ollama 启动
     echo       等待 Ollama 启动...
     set "OLLAMA_READY=0"
     for /L %%i in (1,1,30) do (
@@ -124,17 +114,14 @@ echo.
 :: ------------------------------------------------------------
 echo [2/3] 启动 Embedding 代理...
 
-:: 检查端口 8001 是否已占用
 netstat -ano | findstr ":8001.*LISTENING" >nul 2>&1
 if %errorlevel% equ 0 (
     echo       ✓ Embedding 代理已在运行 (端口 8001)
 ) else (
-    :: 切换到 app 目录启动（确保能找到 embed_proxy.py）
     pushd "%APP_DIR%"
-    start /b "" "%VENV_DIR%\Scripts\pythonw.exe" -m uvicorn embed_proxy:app --host 127.0.0.1 --port 8001 >"%LOGS_DIR%\embed-proxy.log" 2>&1
+    start /b "" "%PYTHON_EXE%" -m uvicorn embed_proxy:app --host 127.0.0.1 --port 8001 >"%LOGS_DIR%\embed-proxy.log" 2>&1
     popd
     
-    :: 等待代理启动
     echo       等待 Embedding 代理启动...
     set "PROXY_READY=0"
     for /L %%i in (1,1,30) do (
@@ -179,14 +166,13 @@ echo ║                                                          ║
 echo ╚══════════════════════════════════════════════════════════╝
 echo.
 
-:: 切换到 app 目录
 cd /d "%APP_DIR%"
 
-:: 前台启动 Open WebUI
-"%VENV_DIR%\Scripts\open-webui.exe" serve
+:: 使用内置 Python 运行 open-webui
+"%PYTHON_EXE%" -m open_webui serve
 
 :: ------------------------------------------------------------
-:: 当 Open WebUI 退出时（窗口关闭或 Ctrl+C），自动清理
+:: 退出时自动清理
 :: ------------------------------------------------------------
 echo.
 echo [清理] Open WebUI 已退出，正在停止后台服务...

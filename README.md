@@ -1,15 +1,23 @@
 # Open WebUI Windows 一键安装包
 
-[![Build Windows Installer](https://github.com/YOUR_USERNAME/open-webui-windows/actions/workflows/build-installer.yml/badge.svg)](https://github.com/YOUR_USERNAME/open-webui-windows/actions/workflows/build-installer.yml)
+[![Build Windows Installer](https://github.com/Coolog/open-webui-windows/actions/workflows/build-installer.yml/badge.svg)](https://github.com/Coolog/open-webui-windows/actions/workflows/build-installer.yml)
 
 本安装包将在 Windows 系统上一键部署 Open WebUI + Ollama + Embedding 代理服务。
 
+## ✨ 特点
+
+- **零依赖安装** - 内置 Python 3.11，无需预装任何软件
+- **一键安装** - 双击 exe 即可完成全部配置
+- **自动下载模型** - 自动安装 Ollama 并下载所需模型
+- **完全离线运行** - 安装完成后无需联网即可使用
+
 ## 📥 下载安装
 
-从 [Releases](https://github.com/YOUR_USERNAME/open-webui-windows/releases) 页面下载最新版本的 `OpenWebUI-Setup-x.x.x.exe`
+从 [Releases](https://github.com/Coolog/open-webui-windows/releases) 页面下载最新版本的 `OpenWebUI-Setup-x.x.x.exe`
 
 ## 📦 包含内容
 
+- **Python 3.11** (嵌入式版本，内置)
 - **Open WebUI** - 现代化的 AI 对话界面
 - **Ollama** - 本地大模型运行时
 - **Embedding 代理** - RAG 功能的 embedding 服务
@@ -22,8 +30,9 @@
 - **操作系统**: Windows 10/11 (64位)
 - **内存**: 建议 16GB 以上（运行 7B 模型）
 - **磁盘**: 至少 20GB 可用空间
-- **Python**: 3.10 或 3.11（如未安装，请先安装）
-- **网络**: 首次安装需要联网下载模型
+- **网络**: 首次安装需要联网下载模型（约 10GB）
+
+> ⚠️ **无需预装 Python！** 安装包已内置 Python 3.11
 
 ## 🚀 安装步骤
 
@@ -56,8 +65,8 @@
 
 ```
 安装目录/
+├── python/                 # 内置 Python 3.11
 ├── app/                    # 程序文件
-│   ├── .venv/             # Python 虚拟环境
 │   ├── logs/              # 运行日志
 │   ├── embed_proxy.py     # Embedding 代理
 │   └── requirements.txt   # Python 依赖
@@ -80,12 +89,6 @@
 | Ollama | 11434 | 模型服务 |
 
 ## 🔧 常见问题
-
-### Q: Python 未安装怎么办？
-
-访问 https://www.python.org/downloads/release/python-3119/ 下载安装 Python 3.11
-
-**安装时务必勾选 "Add Python to PATH"**
 
 ### Q: 模型下载失败？
 
@@ -112,26 +115,9 @@ ollama pull qwen3-embedding:latest
 
 ### v1.0.0
 - 初始版本
+- 内置 Python 3.11，无需预装
 - 支持 Open WebUI + Ollama + Embedding 代理
 - 预装 qwen2.5:7b 和 qwen3-embedding:latest 模型
-
-## 🔨 开发说明
-
-### 构建安装包
-
-本项目使用 GitHub Actions 自动构建，推送代码后会自动生成安装包。
-
-手动构建：
-1. 在 Windows 上安装 [Inno Setup](https://jrsoftware.org/isinfo.php)
-2. 运行 `ISCC.exe setup.iss`
-3. 安装包生成在 `output/` 目录
-
-### 发布新版本
-
-1. 修改 `setup.iss` 中的版本号
-2. 创建 tag: `git tag v1.0.1`
-3. 推送: `git push origin v1.0.1`
-4. GitHub Actions 会自动构建并创建 Release
 
 ## 📄 许可证
 

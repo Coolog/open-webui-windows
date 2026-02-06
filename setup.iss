@@ -1,6 +1,6 @@
 ; ============================================================
 ; Open WebUI Windows 安装包配置
-; 使用 Inno Setup 编译
+; 包含嵌入式 Python，无需用户预装
 ; ============================================================
 
 #define MyAppName "Open WebUI"
@@ -27,7 +27,6 @@ UsePreviousAppDir=yes
 OutputDir=output
 OutputBaseFilename=OpenWebUI-Setup-{#MyAppVersion}
 
-; 如果没有 icon.ico，使用默认图标
 #ifexist "icon.ico"
 SetupIconFile=icon.ico
 UninstallDisplayIcon={app}\icon.ico
@@ -50,7 +49,6 @@ CloseApplications=yes
 RestartApplications=no
 
 [Languages]
-; 只使用默认英文，避免语言包不存在的问题
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [CustomMessages]
@@ -61,12 +59,17 @@ english.LaunchApp=Launch Open WebUI
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce
 
 [Files]
+; 嵌入式 Python（包含 pip）
+Source: "python\*"; DestDir: "{app}\python"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+; 应用程序文件
 Source: "embed_proxy.py"; DestDir: "{app}\app"; Flags: ignoreversion
 Source: "requirements.txt"; DestDir: "{app}\app"; Flags: ignoreversion
 Source: "install.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "start.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "stop.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
+
 #ifexist "icon.ico"
 Source: "icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 #endif
@@ -98,6 +101,7 @@ Filename: "{app}\stop.bat"; Parameters: "--no-pause"; WorkingDir: "{app}"; Flags
 Type: filesandordirs; Name: "{app}\app\.venv"
 Type: filesandordirs; Name: "{app}\app\logs"
 Type: filesandordirs; Name: "{app}\app\__pycache__"
+Type: filesandordirs; Name: "{app}\python"
 
 [Code]
 function InitializeUninstall(): Boolean;
