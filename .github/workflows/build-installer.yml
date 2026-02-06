@@ -1,0 +1,73 @@
+name: Build Windows Installer
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Download and Setup Inno Setup
+      run: |
+        # 下载 Inno Setup
+        $url = "https://jrsoftware.org/download.php/is.exe"
+        $output = "$env:TEMP\innosetup.exe"
+        Write-Host "Downloading Inno Setup..."
+        Invoke-WebRequest -Uri $url -OutFile $output -UseBasicParsing
+        
+        # 静默安装 Inno Setup
+        Write-Host "Installing Inno Setup..."
+        Start-Process -FilePath $output -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-" -Wait
+        
+        # 添加到 PATH
+        $innoPath = "C:\Program Files (x86)\Inno Setup 6"
+        echo "$innoPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      shell: pwsh
+    
+    - name: Verify Inno Setup Installation
+      run: |
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /? || true
+      shell: pwsh
+    
+    - name: Create output directory
+      run: mkdir -p output
+      shell: bash
+    
+    - name: Build Installer
+      run: |
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
+      shell: pwsh
+    
+    - name: List output files
+      run: |
+        Write-Host "=== Output directory contents ==="
+        Get-ChildItem -Path output -Recurse
+      shell: pwsh
+    
+    - name: Upload Installer Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: OpenWebUI-Windows-Installer
+        path: output/*.exe
+        retention-days: 30
+    
+    - name: Create Release (on tag push)
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: output/*.exe
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
