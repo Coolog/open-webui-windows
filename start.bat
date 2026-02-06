@@ -1,22 +1,20 @@
 @echo off
-chcp 65001 >nul
 setlocal EnableDelayedExpansion
 
 :: ============================================================
-:: Open WebUI 启动脚本
-:: 使用内置嵌入式 Python
+:: Open WebUI Startup Script
 :: ============================================================
 
 title Open WebUI
 
 echo.
-echo ╔══════════════════════════════════════════════════════════╗
-echo ║              Open WebUI 启动中...                        ║
-echo ╚══════════════════════════════════════════════════════════╝
+echo ============================================================
+echo              Open WebUI Starting...
+echo ============================================================
 echo.
 
 :: ------------------------------------------------------------
-:: 加载配置
+:: Load Configuration
 :: ------------------------------------------------------------
 set "SCRIPT_DIR=%~dp0"
 if "%SCRIPT_DIR:~-1%"=="\" set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
@@ -30,18 +28,18 @@ if exist "%SCRIPT_DIR%\app\config.bat" (
     set "PYTHON_DIR=%SCRIPT_DIR%\python"
     set "PYTHON_EXE=%SCRIPT_DIR%\python\python.exe"
     set "LOGS_DIR=%SCRIPT_DIR%\app\logs"
-    set "OLLAMA_CMD=ollama"
+    set "OLLAMA_CMD="
 )
 
-echo [信息] 安装目录: %INSTALL_DIR%
-echo [信息] 数据目录: %DATA_DIR%
+echo [INFO] Install directory: %INSTALL_DIR%
+echo [INFO] Data directory: %DATA_DIR%
 echo.
 
 if not exist "%LOGS_DIR%" mkdir "%LOGS_DIR%"
 if not exist "%DATA_DIR%" mkdir "%DATA_DIR%"
 
 :: ------------------------------------------------------------
-:: 设置 Open WebUI 环境变量
+:: Set Open WebUI Environment Variables
 :: ------------------------------------------------------------
 set "OFFLINE_MODE=true"
 set "RAG_EMBEDDING_MODEL_AUTO_UPDATE=false"
@@ -64,30 +62,88 @@ set "OPENAI_API_BASE=http://127.0.0.1:8001/v1"
 set "OPENAI_API_KEY=dummy"
 
 :: ------------------------------------------------------------
-:: 查找 Ollama
+:: Find Ollama
 :: ------------------------------------------------------------
-if "%OLLAMA_CMD%"=="" set "OLLAMA_CMD=ollama"
-if not exist "%OLLAMA_CMD%" (
-    where ollama >nul 2>&1
-    if %errorlevel% equ 0 (
-        set "OLLAMA_CMD=ollama"
-    ) else if exist "%LOCALAPPDATA%\Programs\Ollama\ollama.exe" (
-        set "OLLAMA_CMD=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
+echo [1/3] Starting Ollama service...
+
+:: Try to find Ollama in various locations
+set "OLLAMA_FOUND=0"
+
+:: Check if OLLAMA_CMD is set and valid
+if defined OLLAMA_CMD (
+    if exist "!OLLAMA_CMD!" (
+        set "OLLAMA_FOUND=1"
+        goto :ollama_check_done
     )
 )
 
-:: ------------------------------------------------------------
-:: 启动 Ollama 服务
-:: ------------------------------------------------------------
-echo [1/3] 启动 Ollama 服务...
+:: Check PATH
+where ollama.exe >nul 2>&1
+if %errorlevel% equ 0 (
+    set "OLLAMA_CMD=ollama.exe"
+    set "OLLAMA_FOUND=1"
+    goto :ollama_check_done
+)
 
+:: Check common install locations
+if exist "%LOCALAPPDATA%\Programs\Ollama\ollama.exe" (
+    set "OLLAMA_CMD=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
+    set "OLLAMA_FOUND=1"
+    goto :ollama_check_done
+)
+
+if exist "%USERPROFILE%\AppData\Local\Programs\Ollama\ollama.exe" (
+    set "OLLAMA_CMD=%USERPROFILE%\AppData\Local\Programs\Ollama\ollama.exe"
+    set "OLLAMA_FOUND=1"
+    goto :ollama_check_done
+)
+
+if exist "%ProgramFiles%\Ollama\ollama.exe" (
+    set "OLLAMA_CMD=%ProgramFiles%\Ollama\ollama.exe"
+    set "OLLAMA_FOUND=1"
+    goto :ollama_check_done
+)
+
+if exist "C:\Program Files\Ollama\ollama.exe" (
+    set "OLLAMA_CMD=C:\Program Files\Ollama\ollama.exe"
+    set "OLLAMA_FOUND=1"
+    goto :ollama_check_done
+)
+
+:ollama_check_done
+
+if "%OLLAMA_FOUND%"=="0" (
+    echo.
+    echo ============================================================
+    echo  ERROR: Ollama not found!
+    echo ============================================================
+    echo.
+    echo  Ollama is required to run Open WebUI.
+    echo.
+    echo  Please install Ollama manually:
+    echo    1. Download from: https://ollama.com/download
+    echo    2. Run the installer
+    echo    3. Restart this script
+    echo.
+    echo ============================================================
+    pause
+    exit /b 1
+)
+
+echo       Ollama found: !OLLAMA_CMD!
+
+:: ------------------------------------------------------------
+:: Start Ollama Service
+:: ------------------------------------------------------------
+:: Check if Ollama is already running
 powershell -Command "try { $r = Invoke-WebRequest -Uri 'http://localhost:11434/api/tags' -TimeoutSec 2 -UseBasicParsing; exit 0 } catch { exit 1 }" >nul 2>&1
 if %errorlevel% equ 0 (
-    echo       ✓ Ollama 服务已在运行
+    echo       Ollama service is already running.
 ) else (
+    echo       Starting Ollama service...
     start /b "" "!OLLAMA_CMD!" serve >"%LOGS_DIR%\ollama.log" 2>&1
     
-    echo       等待 Ollama 启动...
+    echo       Waiting for Ollama to start...
     set "OLLAMA_READY=0"
     for /L %%i in (1,1,30) do (
         if !OLLAMA_READY! equ 0 (
@@ -95,14 +151,14 @@ if %errorlevel% equ 0 (
             powershell -Command "try { $r = Invoke-WebRequest -Uri 'http://localhost:11434/api/tags' -TimeoutSec 2 -UseBasicParsing; exit 0 } catch { exit 1 }" >nul 2>&1
             if !errorlevel! equ 0 (
                 set "OLLAMA_READY=1"
-                echo       ✓ Ollama 服务已启动
+                echo       Ollama service started.
             )
         )
     )
     
     if !OLLAMA_READY! equ 0 (
-        echo       ✗ Ollama 启动超时！
-        echo       请检查 %LOGS_DIR%\ollama.log
+        echo       ERROR: Ollama failed to start!
+        echo       Please check: %LOGS_DIR%\ollama.log
         pause
         exit /b 1
     )
@@ -110,70 +166,65 @@ if %errorlevel% equ 0 (
 echo.
 
 :: ------------------------------------------------------------
-:: 启动 Embedding 代理
+:: Start Embedding Proxy
 :: ------------------------------------------------------------
-echo [2/3] 启动 Embedding 代理...
+echo [2/3] Starting Embedding proxy...
 
 netstat -ano | findstr ":8001.*LISTENING" >nul 2>&1
 if %errorlevel% equ 0 (
-    echo       ✓ Embedding 代理已在运行 (端口 8001)
+    echo       Embedding proxy is already running (port 8001).
 ) else (
     pushd "%APP_DIR%"
     start /b "" "%PYTHON_EXE%" -m uvicorn embed_proxy:app --host 127.0.0.1 --port 8001 >"%LOGS_DIR%\embed-proxy.log" 2>&1
     popd
     
-    echo       等待 Embedding 代理启动...
+    echo       Waiting for Embedding proxy to start...
     set "PROXY_READY=0"
     for /L %%i in (1,1,30) do (
         if !PROXY_READY! equ 0 (
             timeout /t 1 /nobreak >nul
-            powershell -Command "try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:8001/v1/embeddings' -Method Post -Body '{\"model\":\"test\",\"input\":\"ping\"}' -ContentType 'application/json' -TimeoutSec 2 -UseBasicParsing; exit 0 } catch { exit 1 }" >nul 2>&1
+            netstat -ano | findstr ":8001.*LISTENING" >nul 2>&1
             if !errorlevel! equ 0 (
                 set "PROXY_READY=1"
-                echo       ✓ Embedding 代理已启动 (端口 8001)
+                echo       Embedding proxy started (port 8001).
             )
         )
     )
     
     if !PROXY_READY! equ 0 (
-        echo       ⚠ Embedding 代理启动超时
-        echo       RAG 功能可能不可用，但不影响基本对话
-        echo       请检查 %LOGS_DIR%\embed-proxy.log
+        echo       WARNING: Embedding proxy may not have started.
+        echo       RAG features may not work, but chat will still function.
+        echo       Check: %LOGS_DIR%\embed-proxy.log
     )
 )
 echo.
 
 :: ------------------------------------------------------------
-:: 启动 Open WebUI
+:: Start Open WebUI
 :: ------------------------------------------------------------
-echo [3/3] 启动 Open WebUI...
+echo [3/3] Starting Open WebUI...
 echo.
-echo ╔══════════════════════════════════════════════════════════╗
-echo ║                                                          ║
-echo ║  Open WebUI 正在启动...                                  ║
-echo ║                                                          ║
-echo ║  请在浏览器中访问: http://localhost:8080                 ║
-echo ║                                                          ║
-echo ║  首次访问需要注册管理员账号                              ║
-echo ║                                                          ║
-echo ║  ┌────────────────────────────────────────────────────┐  ║
-echo ║  │  关闭方式:                                         │  ║
-echo ║  │    - 直接关闭此窗口 (会自动清理后台服务)           │  ║
-echo ║  │    - 或按 Ctrl+C                                   │  ║
-echo ║  │    - 或运行 stop.bat                               │  ║
-echo ║  └────────────────────────────────────────────────────┘  ║
-echo ║                                                          ║
-echo ╚══════════════════════════════════════════════════════════╝
+echo ============================================================
+echo.
+echo   Open WebUI is starting...
+echo.
+echo   Access URL: http://localhost:8080
+echo.
+echo   First-time users need to register an admin account.
+echo.
+echo   To stop: Close this window or press Ctrl+C
+echo.
+echo ============================================================
 echo.
 
 cd /d "%APP_DIR%"
 
-:: 使用内置 Python 运行 open-webui
+:: Run open-webui with embedded Python
 "%PYTHON_EXE%" -m open_webui serve
 
 :: ------------------------------------------------------------
-:: 退出时自动清理
+:: Cleanup on exit
 :: ------------------------------------------------------------
 echo.
-echo [清理] Open WebUI 已退出，正在停止后台服务...
+echo [CLEANUP] Open WebUI stopped, cleaning up background services...
 call "%INSTALL_DIR%\stop.bat" --no-pause
