@@ -32,9 +32,8 @@ SetupIconFile=icon.ico
 UninstallDisplayIcon={app}\icon.ico
 #endif
 
-Compression=lzma2/ultra64
+Compression=lzma2/max
 SolidCompression=yes
-LZMAUseSeparateProcess=yes
 
 PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=dialog
@@ -93,11 +92,12 @@ Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Open WebUI"; Filename: "{app}\start.bat"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{cmd}"; Parameters: "/c set ""INSTALL_DIR={app}"" && ""{app}\install.bat"""; WorkingDir: "{app}"; Flags: runhidden waituntilterminated; StatusMsg: "Configuring environment and downloading models (this may take a few minutes)..."
+; 使用 cmd /c 运行 install.bat，设置 INSTALL_DIR 环境变量
+Filename: "{cmd}"; Parameters: "/c set ""INSTALL_DIR={app}"" && ""{app}\install.bat"" --silent"; WorkingDir: "{app}"; Flags: runhidden waituntilterminated; StatusMsg: "Installing dependencies and downloading models (this may take several minutes)..."
 Filename: "{app}\start.bat"; Description: "{cm:LaunchApp}"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent shellexec
 
 [UninstallRun]
-Filename: "{app}\stop.bat"; Parameters: "--no-pause"; WorkingDir: "{app}"; Flags: runhidden waituntilterminated
+Filename: "{app}\stop.bat"; Parameters: "--no-pause"; WorkingDir: "{app}"; Flags: runhidden waituntilterminated skipifdoesntexist
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\app\.venv"
@@ -106,31 +106,6 @@ Type: filesandordirs; Name: "{app}\app\__pycache__"
 Type: filesandordirs; Name: "{app}\python"
 
 [Code]
-var
-  DeleteModelsCheckbox: TNewCheckBox;
-  DeleteOllamaCheckbox: TNewCheckBox;
-
-procedure InitializeUninstallProgressForm();
-begin
-  // 创建删除模型选项
-  DeleteModelsCheckbox := TNewCheckBox.Create(UninstallProgressForm);
-  DeleteModelsCheckbox.Parent := UninstallProgressForm;
-  DeleteModelsCheckbox.Caption := 'Delete Ollama models (qwen2.5:7b, qwen3-embedding) - Free ~10GB';
-  DeleteModelsCheckbox.Checked := False;
-  DeleteModelsCheckbox.Left := ScaleX(20);
-  DeleteModelsCheckbox.Top := ScaleY(10);
-  DeleteModelsCheckbox.Width := ScaleX(400);
-  
-  // 创建卸载 Ollama 选项
-  DeleteOllamaCheckbox := TNewCheckBox.Create(UninstallProgressForm);
-  DeleteOllamaCheckbox.Parent := UninstallProgressForm;
-  DeleteOllamaCheckbox.Caption := 'Uninstall Ollama completely (if not used by other apps)';
-  DeleteOllamaCheckbox.Checked := False;
-  DeleteOllamaCheckbox.Left := ScaleX(20);
-  DeleteOllamaCheckbox.Top := ScaleY(35);
-  DeleteOllamaCheckbox.Width := ScaleX(400);
-end;
-
 function InitializeUninstall(): Boolean;
 var
   ResultCode: Integer;
@@ -171,13 +146,12 @@ begin
   begin
     // 停止 Ollama 服务
     Exec('taskkill', '/F /IM ollama.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Exec('taskkill', '/F /IM ollama app.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('taskkill', '/F /IM "ollama app.exe"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     
     // 删除 Ollama 数据目录
-    DelTree(ExpandConstant('{userappdata}\.ollama'), True, True, True);
     DelTree(ExpandConstant('{%USERPROFILE}\.ollama'), True, True, True);
     
-    // 尝试通过控制面板卸载 Ollama（静默方式可能不可用，所以提示用户）
+    // 提示用户手动卸载 Ollama 程序
     MsgBox('Please manually uninstall Ollama from Windows Settings > Apps > Installed apps'#13#10#13#10 +
            'The Ollama models and data have been deleted.', mbInformation, MB_OK);
   end;
