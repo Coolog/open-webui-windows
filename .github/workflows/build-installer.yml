@@ -31,14 +31,8 @@ jobs:
         
         # 修改 python311._pth 以启用 pip 和 site-packages
         $pthFile = "python/python311._pth"
-        $pthContent = @"
-python311.zip
-.
-Lib/site-packages
-
-import site
-"@
-        Set-Content -Path $pthFile -Value $pthContent
+        $pthContent = "python311.zip`n.`nLib/site-packages`n`nimport site"
+        Set-Content -Path $pthFile -Value $pthContent -NoNewline
         
         # 创建 Lib/site-packages 目录
         New-Item -ItemType Directory -Path "python/Lib/site-packages" -Force
